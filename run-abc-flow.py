@@ -1,11 +1,13 @@
 # ABC FLOW ALGORITHM
-import sys
 from copy import deepcopy
 
 import numpy
 from numpy import *
 from numpy.random import *
 from scipy.stats import ks_2samp
+
+from xml.etree import ElementTree
+import sys, getopt
 
 import flowModel as model
 from flowOutput import output_handler
@@ -157,7 +159,9 @@ class abc_flow:
                     x = sorted( sim[tp][:,0] )
 
                     # KS dist
+                    #Computes the Kolmogorov-Smirnov statistic on 2 samples.
                     rr = ks_2samp(x, y)
+                    #Returns [KS-statistic, p-value]
                     dist += rr[0]
 
                 if mode == 2:
@@ -197,8 +201,11 @@ class abc_flow:
         while done == False:
             print "\tRunning batch, nsims/nacc:", ntotsim, naccepted
 
+            #Parameters
             dynParameters = self.sample_dyn_pars(nbatch)
+            #Initial conditions
             inits = self.sample_inits(nbatch)
+            #Intensity parameters
             intMus, intSgs = self.sample_int_pars(nbatch) 
             print "\tDone sampling"
             
@@ -244,6 +251,7 @@ class abc_flow:
             currIntSgs = zeros([nparticles,self.nFP])
 
             # calculate the scales for this population
+            #(max-min)/2
             scales_dyn = self.calculate_scales(nparticles, acceptedDynParams)
             scales_inits = self.calculate_scales(nparticles, acceptedInits)
             scales_Mus = self.calculate_scales(nparticles, acceptedIntMus)
@@ -255,7 +263,7 @@ class abc_flow:
             naccepted = 0
             while doneRej == False:
                 print "\tRunning batch, nsims/nacc:", ntotsim, naccepted
-
+                #Generates a random sample from a given 1-D array
                 ids = numpy.random.choice( nparticles, size=nbatch, replace=True, p=acceptedWeights)
                 print "sampled ids:", ids
                 dynParameters = self.sample_perturb_pars(nbatch, self.dynPriors, acceptedDynParams, ids, scales=scales_dyn )
@@ -284,6 +292,7 @@ class abc_flow:
             print "do_abc_smc : Population", pop, "\tacceptance rate = ", naccepted/float(ntotsim)
 
             # update weights
+            #column_stack = Stack 1-D arrays as columns into a 2-D array.
             currPar = column_stack( (currDynParams, currInits, currIntMus, currIntSgs) )
             prevPar = column_stack( (acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs) )
             all_scales = concatenate( (scales_dyn, scales_inits, scales_Mus, scales_Sgs) )
@@ -302,167 +311,115 @@ class abc_flow:
         print "do_abc_smc : Completed successfully"
         return [acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs, acceptedWeights]
 
+
+def read_input(filename):
+
+    document = ElementTree.parse(filename)
+
+    data_f = document.find('data_file')
+    data_file = data_f.text
+    plot_data_f = document.find('plot_data_file')
+    plot_data_file = plot_data_f.text
+    model_f = document.find('model_file')
+    model_file = model_f.text
+
+    dynPriors = []
+    for item in document.find('dynPriors').getchildren():
+        dynPriors.append([item.find('start').text, item.find('end').text])
+    dynPriors = array(dynPriors)
+
+    nparam = len(dynPriors)
+    iniPriors = []
+    for item in document.find('iniPriors').getchildren():
+        iniPriors.append([item.find('start').text, item.find('end').text])
+    iniPriors = array(iniPriors)
+
+    nspec = len(iniPriors)
+    fps = []
+    for it in document.find('fps').getchildren():
+        fps.append(int(it.find('position').text))
+    nfp = len(fps)
+
+    intensMeanPrior = []
+    for item in document.find('intensMeanPrior').getchildren():
+        intensMeanPrior.append([item.find('start').text, item.find('end').text])
+    intensMeanPrior = array(intensMeanPrior)
+
+    intensSigmaPrior = []
+    for item in document.find('intensSigmaPrior').getchildren():
+        intensSigmaPrior.append([item.find('start').text, item.find('end').text])
+    intensSigmaPrior = array(intensSigmaPrior)
+
+    epsilons = []
+    for item in document.find('epsilons').getchildren():
+        epsilons.append(float(item.find('epsilon').text))
+
+    npart = document.find('npartices')
+    nparticles = int(npart.text)
+    nb = document.find('nbeta')
+    nbeta = int(nb.text)
+    alg = document.find('algorithm')
+    algorithm = alg.text
+
+    return data_file, plot_data_file, model_file, dynPriors, iniPriors, nparam, nspec, fps, nfp, intensMeanPrior, \
+           intensSigmaPrior, epsilons, nparticles, nbeta, algorithm
+
 def main():
 
+    opts, args = getopt.getopt(sys.argv[1:], "hi:o::", ["ifile=", "ofile="])
+    for opt, arg in opts:
+
+        if opt in ("-i", "--ifile"):
+            data_file, plot_data_file, model_file, dynPriorMatrix, initPriorMatrix, nparam, nspec, fps, nfp,\
+                intMeanPriorMatrix, intSigmaPriorMatrix, epsilons, nparticles, nbeta, algorithm = read_input(arg)
+
+        if opt in ("-o", "--ofile"):
+            #print arg
+            continue
+
     abcAlg = abc_flow()
+    abcAlg.read_data(data_file)
+
+    # plot the data
+    outHan = output_handler()
+    outHan.plot_data_dict_2D(plot_data_file, abcAlg.data, abcAlg.timePoints)
+
+    # define the model
+    model_n = model.model(model_file, nspecies=nspec, nparams=nparam)
+
+    # priors
+    # real values : 100, 2, 800, 100, 2, 800, 1
+
+    # Set which fluorescent proteins are measured
+    # and their means and sigmas
+    # real values : 1, 5
 
 
-    if 0:
-        abcAlg.read_data("model-gene-exp/flow-data-gene-exp.txt")
+    # Set the internal variables
+    abcAlg.set_dynamical_priors( dynPriorMatrix)
+    abcAlg.set_init_priors(initPriorMatrix)
+    abcAlg.set_intensity_priors(fps, intMeanPriorMatrix, intSigmaPriorMatrix)
 
-        # plot the data
-        outHan = output_handler()
-        outHan.plot_data_dict_1D("plot-gene-exp-data.pdf",abcAlg.data,abcAlg.timePoints)
+    if algorithm=='abc_smc':
+        accPars, accInit, accMus, accSgs, accWeights = abcAlg.do_abc_smc(model_n, nbeta, nparticles, epsilons)
+    elif algorithm =='abc_rej':
+        accPars, accInit, accMus, accSgs = abcAlg.do_abc_rej(model_n, nbeta, nparticles, epsilons[0])
 
-        # define the model
-        immdeath = model.model("model-gene-exp/model-gene-exp.cu", nspecies=1, nparams=2)
+    # calculate posterior medians
+    medPars = zeros([1, model_n.nparams])
+    medInit = zeros([1, model_n.nspecies])
+    medMu = zeros([1, nfp])
+    medSg = zeros([1, nfp])
 
-        # priors assumed uniform, matrix of size npar x 2 (min max)
-        dynPriorMatrix = array( [[90, 110], [0.09, 0.11]] )
-        #dynPriorMatrix = array( [[0.0, 200], [0.0, 0.2]] )
-        initPriorMatrix = array( [[5, 15]] )
+    medPars[0, :] = [median(accPars[:, i]) for i in range(model_n.nparams)]
+    medInit[0, :] = [median(accInit[:, i]) for i in range(model_n.nspecies)]
+    medMu[0, :] = [median(accMus[:, i]) for i in range(nfp)]
+    medSg[0, :] = [median(accSgs[:, i]) for i in range(nfp)]
+    print "posterior median valuse dynpar/inits :", medPars, medInit, medMu, medSg
 
-        # Set which fluorescent proteins are measured
-        # and their means and sigmas
-        nfp = 1
-        fps = [ 0 ]
-        intMeanPriorMatrix = array( [[0.8, 1.2]])
-        intSigmaPriorMatrix = array( [[0.008, 0.012]] )
+    outHan.make_post_hists("plot-gardner-2D-posteriors-dyn.pdf", accPars, [0, 1, 2, 3, 4, 5, 6])
+    outHan.make_post_hists("plot-gardner-2D-posteriors-init.pdf", accInit, [0, 1])
+    outHan.make_post_hists("plot-gardner-2D-posteriors-mu.pdf", accMus, [0])
+    outHan.make_post_hists("plot-gardner-2D-posteriors-sg.pdf", accSgs, [0])
 
-        # Set the internal variables
-        abcAlg.set_dynamical_priors( dynPriorMatrix )
-        abcAlg.set_init_priors( initPriorMatrix )
-        abcAlg.set_intensity_priors( fps, intMeanPriorMatrix, intSigmaPriorMatrix )
-
-        # ABC algorithm
-        epsilon = 5
-        nparticles = 10
-        nbeta = 500
-        accPars, accInit, accMus, accSgs = abcAlg.do_abc_rej(immdeath, nbeta, nparticles, epsilon)
-
-        # calculate posterior medians
-        medPars = zeros([1,immdeath.nparams])
-        medInit = zeros([1,immdeath.nspecies])
-        medMu = zeros([1,nfp])
-        medSg = zeros([1,nfp])
-        
-        medPars[0,:] = [median(accPars[:,i]) for i in range(immdeath.nparams)]
-        medInit[0,:] = [median(accInit[:,i]) for i in range(immdeath.nspecies)]
-        medMu[0,:] = [median(accMus[:,i]) for i in range(nfp)]
-        medSg[0,:] = [median(accSgs[:,i]) for i in range(nfp)]
-        print "posterior median value dynpar/inits :", medPars, medInit, medMu, medSg
-
-        outHan.make_post_hists("plot-gene-exp-posteriors-dyn.pdf", accPars, [0,1] )
-        outHan.make_post_hists("plot-gene-exp-posteriors-init.pdf", accInit, [0] )
-        outHan.make_post_hists("plot-gene-exp-posteriors-mu.pdf", accMus, [0] )
-        outHan.make_post_hists("plot-gene-exp-posteriors-sg.pdf", accSgs, [0] )
-
-        # resimulate the model with the posterior medians
-        immdeath.create_model_instance(nbeta,abcAlg.timePoints)
-        res = immdeath.simulate(1, medPars, medInit, fps, medMu, medSg )
-
-        # convert the output of cuda-sim into a data dictionary
-        resDict = model.create_dict(res,abcAlg.timePoints)[0]
-        # make some plots
-        outHan.make_qq_plots("plot-gene-exp-final-qq.pdf", abcAlg.data, resDict, abcAlg.timePoints)
-        outHan.make_comp_plot_1D("plot-gene-exp-final-fit.pdf", abcAlg.data, resDict, abcAlg.timePoints)
-
-    if 0:
-        abcAlg.read_data("model-gardner/flow-data-gardner.txt")
-
-        # plot the data
-        outHan = output_handler()
-        outHan.plot_data_dict_2D("plot-gardner-data.pdf",abcAlg.data,abcAlg.timePoints)
-
-        # define the model
-        gardner = model.model("model-gardner/model-gardner.cu", nspecies=2, nparams=7)
-
-        # priors
-        # real values : 100, 2, 800, 100, 2, 800, 1
-        dynPriorMatrix = array( [ [80, 120],[1,3],[700,900], [80, 120],[1,3],[700,900], [0.5,1.5] ] )
-        initPriorMatrix = array( [[0, 20], [50,150]] )
-
-        # Set which fluorescent proteins are measured and their means and sigmas
-        nfp = 1
-        fps = [0]
-        # real values : 1, 5
-        intMeanPriorMatrix = array( [[0.9, 1.1] ])
-        intSigmaPriorMatrix = array( [[4.5, 5.5] ])
-
-        # Set the internal variables
-        abcAlg.set_dynamical_priors( dynPriorMatrix )
-        abcAlg.set_init_priors( initPriorMatrix )
-        abcAlg.set_intensity_priors( fps, intMeanPriorMatrix, intSigmaPriorMatrix )
-
-        epsilon = 5
-        nparticles = 100
-        nbeta = 500
-        accPars, accInit, accMus, accSgs = abcAlg.do_abc_rej(gardner, nbeta, nparticles, epsilon)
-
-        # calculate posterior medians
-        medPars = zeros([1,gardner.nparams])
-        medInit = zeros([1,gardner.nspecies])
-        medMu = zeros([1,nfp])
-        medSg = zeros([1,nfp])
-        
-        medPars[0,:] = [median(accPars[:,i]) for i in range(gardner.nparams)]
-        medInit[0,:] = [median(accInit[:,i]) for i in range(gardner.nspecies)]
-        medMu[0,:] = [median(accMus[:,i]) for i in range(nfp)]
-        medSg[0,:] = [median(accSgs[:,i]) for i in range(nfp)]
-        print "posterior median valuse dynpar/inits :", medPars, medInit, medMu, medSg
-
-        outHan.make_post_hists("plot-gardner-posteriors-dyn.pdf", accPars, [0,1,2,3,4,5,6] )
-        outHan.make_post_hists("plot-gardner-posteriors-init.pdf", accInit, [0,1] )
-        outHan.make_post_hists("plot-gardner-posteriors-mu.pdf", accMus, [0] )
-        outHan.make_post_hists("plot-gardner-posteriors-sg.pdf", accSgs, [0] )
-
-    if 1:
-        abcAlg.read_data("model-gardner/flow-data-gardner.txt")
-
-        # plot the data
-        outHan = output_handler()
-        outHan.plot_data_dict_2D("plot-gardner-data.pdf",abcAlg.data,abcAlg.timePoints)
-
-        # define the model
-        gardner = model.model("model-gardner/model-gardner.cu", nspecies=2, nparams=7)
-
-        # priors
-        # real values : 100, 2, 800, 100, 2, 800, 1
-        dynPriorMatrix = array( [ [80, 120],[1,3],[700,900], [80, 120],[1,3],[700,900], [0.5,1.5] ] )
-        initPriorMatrix = array( [[0, 20], [50,150]] )
-
-        # Set which fluorescent proteins are measured
-        # and their means and sigmas
-        nfp = 2
-        fps = [ 0, 1 ]
-        # real values : 1, 5
-        intMeanPriorMatrix = array( [[0.9, 1.1], [0.9, 1.1] ])
-        intSigmaPriorMatrix = array( [[4.5, 5.5], [4.5, 5.5] ] )
-
-        # Set the internal variables
-        abcAlg.set_dynamical_priors( dynPriorMatrix )
-        abcAlg.set_init_priors( initPriorMatrix )
-        abcAlg.set_intensity_priors( fps, intMeanPriorMatrix, intSigmaPriorMatrix )
-
-        epsilons = [0.001, 0.0005, 0.00001]
-        nparticles = 100
-        nbeta = 500
-        accPars, accInit, accMus, accSgs, accWeights = abcAlg.do_abc_smc(gardner, nbeta, nparticles, epsilons)
-
-        # calculate posterior medians
-        medPars = zeros([1,gardner.nparams])
-        medInit = zeros([1,gardner.nspecies])
-        medMu = zeros([1,nfp])
-        medSg = zeros([1,nfp])
-        
-        medPars[0,:] = [median(accPars[:,i]) for i in range(gardner.nparams)]
-        medInit[0,:] = [median(accInit[:,i]) for i in range(gardner.nspecies)]
-        medMu[0,:] = [median(accMus[:,i]) for i in range(nfp)]
-        medSg[0,:] = [median(accSgs[:,i]) for i in range(nfp)]
-        print "posterior median valuse dynpar/inits :", medPars, medInit, medMu, medSg
-
-        outHan.make_post_hists("plot-gardner-2D-posteriors-dyn.pdf", accPars, [0,1,2,3,4,5,6] )
-        outHan.make_post_hists("plot-gardner-2D-posteriors-init.pdf", accInit, [0,1] )
-        outHan.make_post_hists("plot-gardner-2D-posteriors-mu.pdf", accMus, [0] )
-        outHan.make_post_hists("plot-gardner-2D-posteriors-sg.pdf", accSgs, [0] )
 main()

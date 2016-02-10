@@ -9,7 +9,9 @@ def get_kd_distance(data, sims, ngrid):
     ymax = max(data[:,1])
 
     # define the grid
-    #ngrid = 10j
+    #ngrid = 10j. Complex number means stop value is inclusive
+    #mgrid returns a dense multi-dimensional meshgrid
+
     xx, yy = mgrid[xmin:xmax:ngrid, ymin:ymax:ngrid ]
     positions = vstack([xx.ravel(), yy.ravel()])
 

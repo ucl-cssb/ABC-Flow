@@ -35,6 +35,8 @@ class model:
         
         # Addition of normals
         if nFP > 0:
+            #max: Return the maximum of an array or maximum along an axis
+            #normal: Draw random samples from a normal (Gaussian) distribution.
             signal = max(0.01, normal(nFP*mu, sqrt(nFP*sigma*sigma) ) )
         
         return signal
