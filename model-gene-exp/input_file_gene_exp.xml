@@ -1,0 +1,59 @@
+<data>
+    <data_file>model-gene-exp/flow-data-gene-exp.txt</data_file>
+    <plot_data_file>plot-gene-exp-data.pdf</plot_data_file>
+    <model_file>model-gene-exp/model-gene-exp.cu</model_file>
+    <dynPriors>
+        <item>
+            <name>parameter1</name>
+            <start>90</start>
+            <end>110</end>
+        </item>
+
+        <item>
+            <name>parameter2</name>
+            <start>0.09</start>
+            <end>0.11</end>
+        </item>
+    </dynPriors>
+
+    <iniPriors>
+        <item>
+            <name>species1</name>
+            <start>5</start>
+            <end>15</end>
+        </item>
+    </iniPriors>
+
+    <fps>
+        <item>
+            <position>0</position>
+        </item>
+    </fps>
+
+    <intensMeanPrior>
+        <item>
+            <name>fp1</name>
+            <start>0.8</start>
+            <end>1.2</end>
+        </item>
+    </intensMeanPrior>
+
+    <intensSigmaPrior>
+        <item>
+            <name>fp1</name>
+            <start>0.008</start>
+            <end>0.012</end>
+        </item>
+    </intensSigmaPrior>
+
+    <epsilons>
+        <item>
+            <epsilon>5</epsilon>
+        </item>
+    </epsilons>
+
+    <npartices>100</npartices>
+    <nbeta>500</nbeta>
+    <algorithm>abc_rej</algorithm>
+
+</data>

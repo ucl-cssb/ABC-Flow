@@ -8,7 +8,7 @@ from scipy.stats import ks_2samp
 
 from xml.etree import ElementTree
 import sys, getopt
-
+import os
 import flowModel as model
 from flowOutput import output_handler
 from flowDist import get_kd_distance
@@ -64,30 +64,30 @@ class abc_flow:
     def sample_dyn_pars(self,n):
         ret = zeros([n,self.nDynPars])
         for j in range(self.nDynPars):
-            ret[:,j] = uniform( self.dynPriors[j,0], self.dynPriors[j,1], n )
+            ret[:, j] = uniform(self.dynPriors[j, 0], self.dynPriors[j, 1], n)
         return ret
 
-    def sample_inits(self,n):
-        ret = zeros([n,self.nSpecies])
+    def sample_inits(self, n):
+        ret = zeros([n, self.nSpecies])
         for j in range(self.nSpecies):
-            ret[:,j] = uniform( self.initPriors[j,0], self.initPriors[j,1], n )
+            ret[:, j] = uniform(self.initPriors[j, 0], self.initPriors[j, 1], n)
         return ret
 
-    def sample_int_pars(self,n):
-        retMu = zeros([n,self.nFP])
-        retSg = zeros([n,self.nFP])
+    def sample_int_pars(self, n):
+        retMu = zeros([n, self.nFP])
+        retSg = zeros([n, self.nFP])
         for j in range(self.nFP):
-            retMu[:,j] = uniform( self.intMeanPriors[j,0], self.intMeanPriors[j,1], n )
-            retSg[:,j] = uniform( self.intSigmaPriors[j,0], self.intSigmaPriors[j,1], n )
+            retMu[:, j] = uniform(self.intMeanPriors[j, 0], self.intMeanPriors[j, 1], n)
+            retSg[:, j] = uniform(self.intSigmaPriors[j, 0], self.intSigmaPriors[j, 1], n)
         return [retMu, retSg]
 
     # Sampling and perturbing functions
-    def sample_perturb_pars(self,n,prior,prev,ids,scales):
-        ret = zeros( shape(prev) )
+    def sample_perturb_pars(self, n, prior, prev, ids, scales):
+        ret = zeros(shape(prev))
         npar = shape(prev)[1]
         for i in range(n):
             for j in range(npar):
-                ret[i,j] = self.kernel_pert(prev[ids[i],j], prior[j,:], scales[j] )
+                ret[i, j] = self.kernel_pert(prev[ids[i], j], prior[j, :], scales[j])
         return ret
 
     def compute_weights(self, n, weightsPrev, currPar, prevPar, scales):
@@ -97,13 +97,13 @@ class abc_flow:
         for i in range(n):
             for j in range(n):
                 #print "\t\t:", i, j, weightsPrev[i], self.kernel_prob( npar, currPar[i,:], prevPar[j,:], scales )
-                ret[i] += weightsPrev[i]*self.kernel_prob( npar, currPar[i,:], prevPar[j,:], scales )
+                ret[i] += weightsPrev[i]*self.kernel_prob(npar, currPar[i, :], prevPar[j, :], scales)
 
         # Normalise
         ret = ret/float(sum(ret))
         return ret
     
-    def kernel_prob(self, npar, currPar, prevPar, scales ):
+    def kernel_prob(self, npar, currPar, prevPar, scales):
         # currPar, prevPar, scales are vector valued
         for i in range(npar):
             if abs(currPar[i] - prevPar[i]) > scales[i]:
@@ -115,8 +115,8 @@ class abc_flow:
         done = False
         while done == False:
             x = uniform(x0-scale, x0+scale)
-            # print "\tx:", x0, x, scale, prior[0], prior[1]
-            if x >= prior[0] and x <= prior[1]:
+            #print "\tx:", x, prior[0], prior[1]
+            if x >= float(prior[0]) and x <= float(prior[1]):
                 done = True
         return x
 
@@ -186,7 +186,7 @@ class abc_flow:
     def do_abc_rej(self, model, nbeta, nparticles, eps):
         
         nbatch = 10
-        model.create_model_instance(nbeta,self.timePoints)
+        model.create_model_instance(nbeta, self.timePoints)
         self.nSpecies, self.nDynPars = model.get_model_info()
         #print "do_abc_rej : Species/Dynamical parameters in this model:", self.nSpecies, self.nDynPars
 
@@ -208,7 +208,6 @@ class abc_flow:
             #Intensity parameters
             intMus, intSgs = self.sample_int_pars(nbatch) 
             print "\tDone sampling"
-            
             sims = model.simulate(nbatch, dynParameters, inits, self.fps, intMus, intSgs)
             print "\tDone simulation"
             dists = self.compare_to_data(nbatch, nbeta, sims, self.nFP )
@@ -236,7 +235,7 @@ class abc_flow:
 
         npop = len(epsilons)
         nbatch = 10
-        model.create_model_instance(nbeta,self.timePoints)
+        model.create_model_instance(nbeta, self.timePoints)
         self.nSpecies, self.nDynPars = model.get_model_info()
 
         # do the first population sampling from the prior
@@ -244,18 +243,18 @@ class abc_flow:
         acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs = self.do_abc_rej(model, nbeta, nparticles, epsilons[0])
         acceptedWeights = ones([nparticles])/float(nparticles)
 
-        for pop in range(1,npop):
-            currDynParams = zeros([nparticles,self.nDynPars])
-            currInits = zeros([nparticles,self.nSpecies])
-            currIntMus = zeros([nparticles,self.nFP])
-            currIntSgs = zeros([nparticles,self.nFP])
+        for pop in range(1, npop):
+            currDynParams = zeros([nparticles, self.nDynPars])
+            currInits = zeros([nparticles, self.nSpecies])
+            currIntMus = zeros([nparticles, self.nFP])
+            currIntSgs = zeros([nparticles, self.nFP])
 
             # calculate the scales for this population
             #(max-min)/2
             scales_dyn = self.calculate_scales(nparticles, acceptedDynParams)
             scales_inits = self.calculate_scales(nparticles, acceptedInits)
             scales_Mus = self.calculate_scales(nparticles, acceptedIntMus)
-            scales_Sgs =  self.calculate_scales(nparticles, acceptedIntSgs)
+            scales_Sgs = self.calculate_scales(nparticles, acceptedIntSgs)
 
             # Rejection stage
             doneRej = False
@@ -264,26 +263,26 @@ class abc_flow:
             while doneRej == False:
                 print "\tRunning batch, nsims/nacc:", ntotsim, naccepted
                 #Generates a random sample from a given 1-D array
-                ids = numpy.random.choice( nparticles, size=nbatch, replace=True, p=acceptedWeights)
+                ids = numpy.random.choice(nparticles, size=nbatch, replace=True, p=acceptedWeights)
                 print "sampled ids:", ids
                 dynParameters = self.sample_perturb_pars(nbatch, self.dynPriors, acceptedDynParams, ids, scales=scales_dyn )
                 inits         = self.sample_perturb_pars(nbatch, self.initPriors, acceptedInits, ids, scales=scales_inits)
                 intMus        = self.sample_perturb_pars(nbatch, self.intMeanPriors, acceptedIntMus, ids, scales=scales_Mus)
-                intSgs        = self.sample_perturb_pars(nbatch, self.intSigmaPriors, acceptedIntSgs, ids, scales=scales_Sgs) 
+                intSgs        = self.sample_perturb_pars(nbatch, self.intSigmaPriors, acceptedIntSgs, ids, scales=scales_Sgs)
                 print "\tDone sampling"
 
                 sims = model.simulate(nbatch, dynParameters, inits, self.fps, intMus, intSgs)
-                dists = self.compare_to_data(nbatch, nbeta, sims, self.nFP )
+                dists = self.compare_to_data(nbatch, nbeta, sims, self.nFP)
                 accMask = self.check_distance(nbatch, dists, epsilons[pop])
 
                 ntotsim += nbatch
 
                 for i in range(nbatch):
                     if accMask[i] == 1 and naccepted < nparticles:
-                        currDynParams[naccepted,:] = dynParameters[i,:]
-                        currInits[naccepted,:] = inits[i,:]
-                        currIntMus[naccepted,:] = intMus[i,]
-                        currIntSgs[naccepted,:] = intSgs[i,]
+                        currDynParams[naccepted, :] = dynParameters[i, :]
+                        currInits[naccepted, :] = inits[i, :]
+                        currIntMus[naccepted, :] = intMus[i, ]
+                        currIntSgs[naccepted, :] = intSgs[i, ]
 
                         naccepted += 1
                     if naccepted == nparticles:
@@ -298,7 +297,7 @@ class abc_flow:
             all_scales = concatenate( (scales_dyn, scales_inits, scales_Mus, scales_Sgs) )
             # print shape(currDynParams), shape(currInits), shape(currIntMus), shape(currIntSgs)
             # print shape(currPar), shape(prevPar)
-            acceptedWeights = self.compute_weights(nparticles, acceptedWeights, currPar, prevPar, scales=all_scales )
+            acceptedWeights = self.compute_weights(nparticles, acceptedWeights, currPar, prevPar, scales=all_scales)
             print "acceptedWeights:"
             print acceptedWeights
             
@@ -325,13 +324,13 @@ def read_input(filename):
 
     dynPriors = []
     for item in document.find('dynPriors').getchildren():
-        dynPriors.append([item.find('start').text, item.find('end').text])
+        dynPriors.append([float(item.find('start').text), float(item.find('end').text)])
     dynPriors = array(dynPriors)
 
     nparam = len(dynPriors)
     iniPriors = []
     for item in document.find('iniPriors').getchildren():
-        iniPriors.append([item.find('start').text, item.find('end').text])
+        iniPriors.append([float(item.find('start').text), float(item.find('end').text)])
     iniPriors = array(iniPriors)
 
     nspec = len(iniPriors)
@@ -374,35 +373,33 @@ def main():
                 intMeanPriorMatrix, intSigmaPriorMatrix, epsilons, nparticles, nbeta, algorithm = read_input(arg)
 
         if opt in ("-o", "--ofile"):
-            #print arg
-            continue
+            try:
+                os.makedirs(arg)
+                results_path = arg
+            except:
+                print 'Results folder already exists'
 
     abcAlg = abc_flow()
     abcAlg.read_data(data_file)
 
     # plot the data
     outHan = output_handler()
-    outHan.plot_data_dict_2D(plot_data_file, abcAlg.data, abcAlg.timePoints)
+    if nfp == 1:
+        outHan.plot_data_dict_1D(results_path, plot_data_file, abcAlg.data, abcAlg.timePoints)
+    elif nfp == 2:
+        outHan.plot_data_dict_2D(results_path, plot_data_file, abcAlg.data, abcAlg.timePoints)
 
     # define the model
     model_n = model.model(model_file, nspecies=nspec, nparams=nparam)
-
-    # priors
-    # real values : 100, 2, 800, 100, 2, 800, 1
-
-    # Set which fluorescent proteins are measured
-    # and their means and sigmas
-    # real values : 1, 5
-
 
     # Set the internal variables
     abcAlg.set_dynamical_priors( dynPriorMatrix)
     abcAlg.set_init_priors(initPriorMatrix)
     abcAlg.set_intensity_priors(fps, intMeanPriorMatrix, intSigmaPriorMatrix)
 
-    if algorithm=='abc_smc':
+    if algorithm == 'abc_smc':
         accPars, accInit, accMus, accSgs, accWeights = abcAlg.do_abc_smc(model_n, nbeta, nparticles, epsilons)
-    elif algorithm =='abc_rej':
+    elif algorithm == 'abc_rej':
         accPars, accInit, accMus, accSgs = abcAlg.do_abc_rej(model_n, nbeta, nparticles, epsilons[0])
 
     # calculate posterior medians
@@ -415,11 +412,29 @@ def main():
     medInit[0, :] = [median(accInit[:, i]) for i in range(model_n.nspecies)]
     medMu[0, :] = [median(accMus[:, i]) for i in range(nfp)]
     medSg[0, :] = [median(accSgs[:, i]) for i in range(nfp)]
-    print "posterior median valuse dynpar/inits :", medPars, medInit, medMu, medSg
+    print "posterior median values dynpar/inits :", medPars, medInit, medMu, medSg
 
-    outHan.make_post_hists("plot-gardner-2D-posteriors-dyn.pdf", accPars, [0, 1, 2, 3, 4, 5, 6])
-    outHan.make_post_hists("plot-gardner-2D-posteriors-init.pdf", accInit, [0, 1])
-    outHan.make_post_hists("plot-gardner-2D-posteriors-mu.pdf", accMus, [0])
-    outHan.make_post_hists("plot-gardner-2D-posteriors-sg.pdf", accSgs, [0])
+    outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-dyn.pdf", accPars, nparam)
+    outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-init.pdf", accInit, nspec)
+    outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-mu.pdf", accMus, nfp)
+    outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-sg.pdf", accSgs, nfp)
+
+    outHan.write_data_to_file(results_path, "data-posteriors-dyn.txt", accPars, nparam)
+    outHan.write_data_to_file(results_path, "data-posteriors-init.txt", accInit, nspec)
+    outHan.write_data_to_file(results_path, "data-posteriors-mu.txt", accMus, nfp)
+    outHan.write_data_to_file(results_path, "data-posteriors-sg.txt", accSgs, nfp)
+
+    #Make new model instance
+    model_n.create_model_instance(nbeta, abcAlg.timePoints)
+    res = model_n.simulate(1, medPars, medInit, fps, medMu, medSg)
+
+    # convert the output of cuda-sim into a data dictionary
+    resDict = model.create_dict(res, abcAlg.timePoints)[0]
+    # make some plots
+    outHan.write_data_to_file(results_path, "data-resampled-pos.txt", resDict, abcAlg.timePoints)
+    if nfp == 1:
+        outHan.make_comp_plot_1D(results_path, "plot-gene-exp-final-fit.pdf", abcAlg.data, resDict, abcAlg.timePoints)
+    elif nfp == 2:
+        outHan.plot_data_dict_2D(results_path, "plot-gard-final-fit.pdf", resDict, abcAlg.timePoints)
 
 main()

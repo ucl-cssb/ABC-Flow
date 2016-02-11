@@ -1,8 +1,9 @@
 <data>
     <data_file>model-gardner/flow-data-gardner.txt</data_file>
-    <plot_data_file>model-gardner/plot-gardner-data.pdf</plot_data_file>
+    <plot_data_file>plot-gardner-data.pdf</plot_data_file>
     <model_file>model-gardner/model-gardner.cu</model_file>
     <dynPriors>
+
         <item>
             <name>parameter1</name>
             <start>80</start>
@@ -64,6 +65,9 @@
         <item>
             <position>0</position>
         </item>
+        <item>
+            <position>1</position>
+        </item>
     </fps>
 
     <intensMeanPrior>
@@ -74,7 +78,7 @@
         </item>
 
         <item>
-            <name>fp2</name>
+            <name>fp1</name>
             <start>0.9</start>
             <end>1.1</end>
         </item>
@@ -88,7 +92,7 @@
         </item>
 
         <item>
-            <name>fp2</name>
+            <name>fp1</name>
             <start>4.5</start>
             <end>5.5</end>
         </item>

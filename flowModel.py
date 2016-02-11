@@ -17,7 +17,7 @@ class model:
         self.modelInstance = 0
 
 
-    def create_model_instance(self,beta,timepoints):
+    def create_model_instance(self, beta, timepoints):
         self.beta = beta
         self.timepoints = timepoints
         self.ntimes = len(timepoints)
@@ -37,22 +37,22 @@ class model:
         if nFP > 0:
             #max: Return the maximum of an array or maximum along an axis
             #normal: Draw random samples from a normal (Gaussian) distribution.
-            signal = max(0.01, normal(nFP*mu, sqrt(nFP*sigma*sigma) ) )
+            signal = max(0.01, normal(nFP*mu, sqrt(nFP*sigma*sigma)))
         
         return signal
 
-    def simulate(self, n, pars, inits,  fps, intMus, intSgs ):
+    def simulate(self, n, pars, inits,  fps, intMus, intSgs):
         print "\tflowModel: calling cuda-sim"
-        species = zeros([n,self.nspecies])
-        pp = zeros([n,self.nparams])
+        species = zeros([n, self.nspecies])
+        pp = zeros([n, self.nparams])
 
         for i in range(n):
-            species[i,:] = inits[i,:]
+            species[i, :] = inits[i, :]
             
             if self.logp == False:
-                pp[i,:] = pars[i,:]
+                pp[i, :] = pars[i, :]
             else:
-                pp[i,:] = power(10,pars[i])
+                pp[i, :] = power(10, pars[i])
 
         simRaw = self.modelInstance.run(pp, species)
 
@@ -64,7 +64,7 @@ class model:
             for j in range(self.beta):
                 for k in range(self.ntimes):
                     for l in range(len(fps)):
-                        simInt[i,j,k, fps[l] ] = self.convert_to_intensity( simRaw[i,j,k, fps[l] ], intMus[i,l], intSgs[i,l] )
+                        simInt[i, j, k, fps[l]] = self.convert_to_intensity(simRaw[i, j, k, fps[l]], intMus[i, l], intSgs[i, l])
 
         return simInt
 
