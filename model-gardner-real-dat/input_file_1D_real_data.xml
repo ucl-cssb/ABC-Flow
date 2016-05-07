@@ -1,0 +1,106 @@
+<data>
+    <data_file>model-gardner/flow-data-gardner.txt</data_file>
+    <plot_data_file>plot-gardner-data.pdf</plot_data_file>
+    <model_file>model-gardner/model-gardner.cu</model_file>
+    <dynPriors>
+
+        <item>
+            <name>parameter1</name>
+            <start>0</start>
+            <end>150</end>
+        </item>
+
+        <item>
+            <name>parameter2</name>
+            <start>1</start>
+            <end>10</end>
+        </item>
+
+        <item>
+            <name>parameter3</name>
+            <start>200</start>
+            <end>1000</end>
+        </item>
+
+        <item>
+            <name>parameter4</name>
+            <start>0</start>
+            <end>150</end>
+        </item>
+
+        <item>
+            <name>parameter5</name>
+            <start>1</start>
+            <end>10</end>
+        </item>
+
+        <item>
+            <name>parameter6</name>
+            <start>200</start>
+            <end>1000</end>
+        </item>
+
+        <item>
+            <name>parameter7</name>
+            <start>0</start>
+            <end>5</end>
+        </item>
+    </dynPriors>
+
+    <iniPriors>
+        <item>
+            <name>species1</name>
+            <start>0</start>
+            <end>20</end>
+        </item>
+
+        <item>
+            <name>species2</name>
+            <start>50</start>
+            <end>150</end>
+        </item>
+    </iniPriors>
+
+    <fps>
+        <item>
+            <position>0</position>
+        </item>
+    </fps>
+
+    <intensMeanPrior>
+        <item>
+            <name>fp1</name>
+            <start>0.9</start>
+            <end>1.1</end>
+        </item>
+    </intensMeanPrior>
+
+    <intensSigmaPrior>
+        <item>
+            <name>fp1</name>
+            <start>4.5</start>
+            <end>5.5</end>
+        </item>
+    </intensSigmaPrior>
+
+    <epsilons>
+        <item>
+            <epsilon>1</epsilon>
+        </item>
+
+        <item>
+            <epsilon>0.5</epsilon>
+        </item>
+
+        <item>
+            <epsilon>0.1</epsilon>
+        </item>
+
+    </epsilons>
+
+    <npartices>100</npartices>
+    <nbeta>500</nbeta>
+    <algorithm>abc_smc</algorithm>
+
+
+</data>
