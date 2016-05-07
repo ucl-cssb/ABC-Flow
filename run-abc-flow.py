@@ -11,7 +11,8 @@ import sys, getopt
 import os
 import flowModel as model
 from flowOutput import output_handler
-from flowDist import get_kd_distance
+from flowDist import get_kd_distance1D
+from flowDist import get_kd_distance2D
 
 class abc_flow:
     def __init__(self):
@@ -33,7 +34,7 @@ class abc_flow:
         self.nvar = shape(rawdata)[1] - 1
 
         # get the number of unique time points
-        self.timePoints = sort( unique( rawdata[:,0]) )
+        self.timePoints = sort(unique(rawdata[:, 0]))
         self.ntimePoints = len(self.timePoints)
         print "read_data : number of variables:", self.nvar
         print "read_data : identified timepoints:", self.ntimePoints
@@ -41,28 +42,28 @@ class abc_flow:
         for i in range(self.ntimePoints):
             tdata = []
             for nd in range(ntot):
-                if rawdata[nd,0] == self.timePoints[i]:
-                    tdata.append( rawdata[nd, 1:(self.nvar+1)] )
+                if rawdata[nd, 0] == self.timePoints[i]:
+                    tdata.append(rawdata[nd, 1:(self.nvar+1)])
                                          
-            self.data[ self.timePoints[i] ] = array(tdata)
+            self.data[ self.timePoints[i]] = array(tdata)
 
         for i in range(self.ntimePoints):
-            print "\t", i, shape( self.data[self.timePoints[i]] )
+            print "\t", i, shape(self.data[self.timePoints[i]])
 
-    def set_dynamical_priors(self, dynPriorMatrix ):
+    def set_dynamical_priors(self, dynPriorMatrix):
         self.dynPriors = dynPriorMatrix
 
-    def set_init_priors(self, initPriorMatrix ):
+    def set_init_priors(self, initPriorMatrix):
         self.initPriors = initPriorMatrix
 
-    def set_intensity_priors(self, fps, intMeanPriorMatrix, intSigmaPriorMatrix ):
+    def set_intensity_priors(self, fps, intMeanPriorMatrix, intSigmaPriorMatrix):
         self.fps = fps
         self.nFP = len(fps)
         self.intMeanPriors = intMeanPriorMatrix
         self.intSigmaPriors = intSigmaPriorMatrix
     
-    def sample_dyn_pars(self,n):
-        ret = zeros([n,self.nDynPars])
+    def sample_dyn_pars(self, n):
+        ret = zeros([n, self.nDynPars])
         for j in range(self.nDynPars):
             ret[:, j] = uniform(self.dynPriors[j, 0], self.dynPriors[j, 1], n)
         return ret
@@ -129,13 +130,13 @@ class abc_flow:
 
     # Simulation and comparison to data
     def compare_to_data(self, n, nbeta, sims, mode=3):
-        ret = zeros([n,1])
+        ret = zeros([n, 1])
 
         # create a dictionary of the same form as the data
         for j in range(n):
             sim = {}
             for nt in range(self.ntimePoints):
-                sim[ self.timePoints[nt] ] = sims[j,:,nt,:]
+                sim[self.timePoints[nt]] = sims[j, :, nt, :]
 
             # Loop over dictionaries
             dist = 0
@@ -155,25 +156,26 @@ class abc_flow:
 
                 if mode == 1:
                     # One dimensional data, general case, sum of Kolmogorov distances
-                    y = sorted( self.data[tp][:,0] )
-                    x = sorted( sim[tp][:,0] )
+                    ##y = sorted(self.data[tp][:, 0])
+                    ##x = sorted(sim[tp][:, 0])
 
                     # KS dist
                     #Computes the Kolmogorov-Smirnov statistic on 2 samples.
-                    rr = ks_2samp(x, y)
+                    ##rr = ks_2samp(x, y)
                     #Returns [KS-statistic, p-value]
-                    dist += rr[0]
+                    ##dist += rr[0]
+                    dist += get_kd_distance1D(self.data[tp], sim[tp], ngrid=10)
 
                 if mode == 2:
                     # Multivariate data, use distance between kernel density estimates
-                    dist += get_kd_distance(self.data[tp], sim[tp] , ngrid=10j )
+                    dist += get_kd_distance2D(self.data[tp], sim[tp], ngrid=10j)
 
             ret[j] = dist
 
         return ret 
             
     def check_distance(self, n, dists, eps ):
-        print "\tcheck_distance : summary : ", percentile(dists,5), median(dists), percentile(dists,95)
+        print "\tcheck_distance : summary : ", percentile(dists, 5), median(dists), percentile(dists, 95)
         ret = zeros([n])
         for j in range(n):
             if dists[j] < eps:
@@ -185,7 +187,7 @@ class abc_flow:
     
     def do_abc_rej(self, model, nbeta, nparticles, eps):
         
-        nbatch = 10
+        nbatch = 100
         model.create_model_instance(nbeta, self.timePoints)
         self.nSpecies, self.nDynPars = model.get_model_info()
         #print "do_abc_rej : Species/Dynamical parameters in this model:", self.nSpecies, self.nDynPars
@@ -234,7 +236,7 @@ class abc_flow:
     def do_abc_smc(self, model, nbeta, nparticles, epsilons):
 
         npop = len(epsilons)
-        nbatch = 10
+        nbatch = 100
         model.create_model_instance(nbeta, self.timePoints)
         self.nSpecies, self.nDynPars = model.get_model_info()
 
@@ -363,6 +365,7 @@ def read_input(filename):
     return data_file, plot_data_file, model_file, dynPriors, iniPriors, nparam, nspec, fps, nfp, intensMeanPrior, \
            intensSigmaPrior, epsilons, nparticles, nbeta, algorithm
 
+
 def main():
 
     opts, args = getopt.getopt(sys.argv[1:], "hi:o::", ["ifile=", "ofile="])
@@ -419,10 +422,10 @@ def main():
     outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-mu.pdf", accMus, nfp)
     outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-sg.pdf", accSgs, nfp)
 
-    outHan.write_data_to_file(results_path, "data-posteriors-dyn.txt", accPars, nparam)
-    outHan.write_data_to_file(results_path, "data-posteriors-init.txt", accInit, nspec)
-    outHan.write_data_to_file(results_path, "data-posteriors-mu.txt", accMus, nfp)
-    outHan.write_data_to_file(results_path, "data-posteriors-sg.txt", accSgs, nfp)
+    outHan.write_post_params_to_file(results_path, "data-posteriors-dyn.txt", accPars, nparam)
+    outHan.write_post_params_to_file(results_path, "data-posteriors-init.txt", accInit, nspec)
+    outHan.write_post_params_to_file(results_path, "data-posteriors-mu.txt", accMus, nfp)
+    outHan.write_post_params_to_file(results_path, "data-posteriors-sg.txt", accSgs, nfp)
 
     #Make new model instance
     model_n.create_model_instance(nbeta, abcAlg.timePoints)
@@ -431,10 +434,11 @@ def main():
     # convert the output of cuda-sim into a data dictionary
     resDict = model.create_dict(res, abcAlg.timePoints)[0]
     # make some plots
-    outHan.write_data_to_file(results_path, "data-resampled-pos.txt", resDict, abcAlg.timePoints)
     if nfp == 1:
         outHan.make_comp_plot_1D(results_path, "plot-gene-exp-final-fit.pdf", abcAlg.data, resDict, abcAlg.timePoints)
+        outHan.write_post_data_to_file(results_path, "post_final_fit_data.txt", resDict, abcAlg.timePoints)
     elif nfp == 2:
         outHan.plot_data_dict_2D(results_path, "plot-gard-final-fit.pdf", resDict, abcAlg.timePoints)
+        outHan.write_post_data_to_file(results_path, "post_final_fit_data.txt", resDict, abcAlg.timePoints)
 
 main()
