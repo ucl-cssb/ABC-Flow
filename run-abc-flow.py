@@ -1,11 +1,8 @@
 # ABC FLOW ALGORITHM
 from copy import deepcopy
-
 import numpy
 from numpy import *
 from numpy.random import *
-from scipy.stats import ks_2samp
-
 from xml.etree import ElementTree
 import sys, getopt
 import os
@@ -135,7 +132,7 @@ class abc_flow:
         # create a dictionary of the same form as the data
         for j in range(n):
             sim = {}
-            for nt in range(self.ntimePoints):
+            for nt in range(self.ntimePoints):      ##[#threads][#beta][#timepoints][#speciesNumber]
                 sim[self.timePoints[nt]] = sims[j, :, nt, :]
 
             # Loop over dictionaries
@@ -164,18 +161,19 @@ class abc_flow:
                     ##rr = ks_2samp(x, y)
                     #Returns [KS-statistic, p-value]
                     ##dist += rr[0]
-                    dist += get_kd_distance1D(self.data[tp], sim[tp], ngrid=10)
-
+                    #dist += ks_2samp(self.data[tp][:, 0], sim[tp][:, 0])
+                    dist += get_kd_distance1D(self.data[tp], sim[tp], ngrid=100)
                 if mode == 2:
                     # Multivariate data, use distance between kernel density estimates
                     dist += get_kd_distance2D(self.data[tp], sim[tp], ngrid=10j)
 
-            ret[j] = dist
+            ret[j] = dist/len(self.timePoints)
 
         return ret 
             
     def check_distance(self, n, dists, eps ):
         print "\tcheck_distance : summary : ", percentile(dists, 5), median(dists), percentile(dists, 95)
+
         ret = zeros([n])
         for j in range(n):
             if dists[j] < eps:
@@ -183,6 +181,13 @@ class abc_flow:
             else:
                 ret[j] = 0
         return ret
+
+
+    def set_epsilon(self, acceptedDists, alpha):
+
+        accDist = sorted(acceptedDists)
+        epsilon = accDist[alpha]
+        return epsilon
 
     
     def do_abc_rej(self, model, nbeta, nparticles, eps):
@@ -199,7 +204,7 @@ class abc_flow:
         acceptedInits = zeros([nparticles,self.nSpecies])
         acceptedIntMus = zeros([nparticles,self.nFP])
         acceptedIntSgs = zeros([nparticles,self.nFP])
-        
+        acceptedDists = zeros([nparticles])
         while done == False:
             print "\tRunning batch, nsims/nacc:", ntotsim, naccepted
 
@@ -213,6 +218,7 @@ class abc_flow:
             sims = model.simulate(nbatch, dynParameters, inits, self.fps, intMus, intSgs)
             print "\tDone simulation"
             dists = self.compare_to_data(nbatch, nbeta, sims, self.nFP )
+            print 'dists: ', dists
             print "\tDone distance calculation"
             accMask = self.check_distance(nbatch, dists, eps)
 
@@ -220,36 +226,53 @@ class abc_flow:
             
             for i in range(nbatch):
                 if accMask[i] == 1 and naccepted < nparticles:
-                    acceptedDynParams[naccepted,:] = dynParameters[i,:]
-                    acceptedInits[naccepted,:] = inits[i,:]
-                    acceptedIntMus[naccepted,:] = intMus[i,]
-                    acceptedIntSgs[naccepted,:] = intSgs[i,]
-
+                    acceptedDynParams[naccepted, :] = dynParameters[i, :]
+                    acceptedInits[naccepted, :] = inits[i, :]
+                    acceptedIntMus[naccepted, :] = intMus[i, ]
+                    acceptedIntSgs[naccepted, :] = intSgs[i, ]
+                    acceptedDists[naccepted] = dists[i]
                     naccepted += 1
                 if naccepted == nparticles:
                     done = True
 
         print "do_abc_rej : Completed"
         print "           : Final acceptance rate = ", naccepted/float(ntotsim)
-        return [acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs]
+        return [acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs, acceptedDists]
 
-    def do_abc_smc(self, model, nbeta, nparticles, epsilons):
+    def do_abc_smc(self, model, nbeta, nparticles, alpha, epsilon_final):
 
-        npop = len(epsilons)
+        pop = 0
+        finishTotal = False
+        #npop = len(epsilons)
         nbatch = 100
         model.create_model_instance(nbeta, self.timePoints)
         self.nSpecies, self.nDynPars = model.get_model_info()
-
         # do the first population sampling from the prior
         print "do_abc_smc : Population 0"
-        acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs = self.do_abc_rej(model, nbeta, nparticles, epsilons[0])
+
+        acceptedDynParams = self.sample_dyn_pars(nbatch)
+        # Initial conditions
+        acceptedInits = self.sample_inits(nbatch)
+        # Intensity parameters
+        acceptedIntMus, acceptedIntSgs = self.sample_int_pars(nbatch)
+        print "\tDone sampling"
+        sims = model.simulate(nbatch, acceptedDynParams, acceptedInits, self.fps, acceptedIntMus, acceptedIntSgs)
+        print "\tDone simulation"
+        currDists = self.compare_to_data(nbatch, nbeta, sims, self.nFP)
+        #acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs, acceptedDists = self.do_abc_rej(model, nbeta, nparticles, epsilons[0])
         acceptedWeights = ones([nparticles])/float(nparticles)
 
-        for pop in range(1, npop):
+        while finishTotal == False:
+        #for pop in range(1, npop):
+            pop += 1
+            epsilon = self.set_epsilon(currDists, alpha)
+            print "Epsilon current:", epsilon
+
             currDynParams = zeros([nparticles, self.nDynPars])
             currInits = zeros([nparticles, self.nSpecies])
             currIntMus = zeros([nparticles, self.nFP])
             currIntSgs = zeros([nparticles, self.nFP])
+            currDists = zeros(nparticles)
 
             # calculate the scales for this population
             #(max-min)/2
@@ -275,8 +298,7 @@ class abc_flow:
 
                 sims = model.simulate(nbatch, dynParameters, inits, self.fps, intMus, intSgs)
                 dists = self.compare_to_data(nbatch, nbeta, sims, self.nFP)
-                accMask = self.check_distance(nbatch, dists, epsilons[pop])
-
+                accMask = self.check_distance(nbatch, dists, epsilon)
                 ntotsim += nbatch
 
                 for i in range(nbatch):
@@ -285,18 +307,21 @@ class abc_flow:
                         currInits[naccepted, :] = inits[i, :]
                         currIntMus[naccepted, :] = intMus[i, ]
                         currIntSgs[naccepted, :] = intSgs[i, ]
-
+                        currDists[naccepted] = dists[i]
                         naccepted += 1
                     if naccepted == nparticles:
                         doneRej = True
 
             print "do_abc_smc : Population", pop, "\tacceptance rate = ", naccepted/float(ntotsim)
+            #pop_fold_res_path = 'Population_' + str(pop)
+            #os.makedirs('Population_' + str(pop))
+            print "Accepted parameters : ", currDynParams
 
             # update weights
             #column_stack = Stack 1-D arrays as columns into a 2-D array.
-            currPar = column_stack( (currDynParams, currInits, currIntMus, currIntSgs) )
-            prevPar = column_stack( (acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs) )
-            all_scales = concatenate( (scales_dyn, scales_inits, scales_Mus, scales_Sgs) )
+            currPar = column_stack((currDynParams, currInits, currIntMus, currIntSgs))
+            prevPar = column_stack((acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs))
+            all_scales = concatenate((scales_dyn, scales_inits, scales_Mus, scales_Sgs))
             # print shape(currDynParams), shape(currInits), shape(currIntMus), shape(currIntSgs)
             # print shape(currPar), shape(prevPar)
             acceptedWeights = self.compute_weights(nparticles, acceptedWeights, currPar, prevPar, scales=all_scales)
@@ -304,12 +329,15 @@ class abc_flow:
             print acceptedWeights
             
             # update best estimates
-            acceptedDynParams = deepcopy( currDynParams )
-            acceptedInits = deepcopy( currInits )
-            acceptedIntMus = deepcopy( currIntMus )
-            acceptedIntSgs = deepcopy( currIntSgs )
+            acceptedDynParams = deepcopy(currDynParams)
+            acceptedInits = deepcopy(currInits)
+            acceptedIntMus = deepcopy(currIntMus)
+            acceptedIntSgs = deepcopy(currIntSgs)
 
-        print "do_abc_smc : Completed successfully"
+            if epsilon <= epsilon_final:
+                finishTotal = True
+                print "do_abc_smc : Completed successfully"
+
         return [acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs, acceptedWeights]
 
 
@@ -351,9 +379,14 @@ def read_input(filename):
         intensSigmaPrior.append([item.find('start').text, item.find('end').text])
     intensSigmaPrior = array(intensSigmaPrior)
 
-    epsilons = []
-    for item in document.find('epsilons').getchildren():
-        epsilons.append(float(item.find('epsilon').text))
+    #epsilons = []
+    #for item in document.find('epsilons').getchildren():
+    #    epsilons.append(float(item.find('epsilon').text))
+
+    eps_f = document.find('epsilon_f')
+    epsilon_final = float(eps_f.text)
+    alp = document.find('alpha')
+    alpha = float(alp.text)
 
     npart = document.find('npartices')
     nparticles = int(npart.text)
@@ -363,17 +396,17 @@ def read_input(filename):
     algorithm = alg.text
 
     return data_file, plot_data_file, model_file, dynPriors, iniPriors, nparam, nspec, fps, nfp, intensMeanPrior, \
-           intensSigmaPrior, epsilons, nparticles, nbeta, algorithm
+           intensSigmaPrior, epsilon_final, alpha, nparticles, nbeta, algorithm
 
 
 def main():
-
     opts, args = getopt.getopt(sys.argv[1:], "hi:o::", ["ifile=", "ofile="])
     for opt, arg in opts:
 
         if opt in ("-i", "--ifile"):
+            print 'Reading input file'
             data_file, plot_data_file, model_file, dynPriorMatrix, initPriorMatrix, nparam, nspec, fps, nfp,\
-                intMeanPriorMatrix, intSigmaPriorMatrix, epsilons, nparticles, nbeta, algorithm = read_input(arg)
+                intMeanPriorMatrix, intSigmaPriorMatrix, epsilon_final, alp, nparticles, nbeta, algorithm = read_input(arg)
 
         if opt in ("-o", "--ofile"):
             try:
@@ -381,16 +414,18 @@ def main():
                 results_path = arg
             except:
                 print 'Results folder already exists'
-
+    alpha = int(math.ceil(alp * nparticles))
+    print 'alpha: ', alpha
+    print 'epsilon_final: ', epsilon_final
     abcAlg = abc_flow()
     abcAlg.read_data(data_file)
 
     # plot the data
     outHan = output_handler()
-    if nfp == 1:
-        outHan.plot_data_dict_1D(results_path, plot_data_file, abcAlg.data, abcAlg.timePoints)
-    elif nfp == 2:
-        outHan.plot_data_dict_2D(results_path, plot_data_file, abcAlg.data, abcAlg.timePoints)
+    #if nfp == 1:
+    #    outHan.plot_data_dict_1D(results_path, plot_data_file, abcAlg.data, abcAlg.timePoints)
+    #elif nfp == 2:
+    #    outHan.plot_data_dict_2D(results_path, plot_data_file, abcAlg.data, abcAlg.timePoints)
 
     # define the model
     model_n = model.model(model_file, nspecies=nspec, nparams=nparam)
@@ -401,9 +436,10 @@ def main():
     abcAlg.set_intensity_priors(fps, intMeanPriorMatrix, intSigmaPriorMatrix)
 
     if algorithm == 'abc_smc':
-        accPars, accInit, accMus, accSgs, accWeights = abcAlg.do_abc_smc(model_n, nbeta, nparticles, epsilons)
+        print 'Do abc_smc'
+        accPars, accInit, accMus, accSgs, accWeights = abcAlg.do_abc_smc(model_n, nbeta, nparticles, alpha, epsilon_final)
     elif algorithm == 'abc_rej':
-        accPars, accInit, accMus, accSgs = abcAlg.do_abc_rej(model_n, nbeta, nparticles, epsilons[0])
+        accPars, accInit, accMus, accSgs = abcAlg.do_abc_rej(model_n, nbeta, nparticles, epsilon_final)
 
     # calculate posterior medians
     medPars = zeros([1, model_n.nparams])
@@ -436,9 +472,11 @@ def main():
     # make some plots
     if nfp == 1:
         outHan.make_comp_plot_1D(results_path, "plot-gene-exp-final-fit.pdf", abcAlg.data, resDict, abcAlg.timePoints)
+        #outHan.make_qq_plots(results_path, "plot-gene-exp-final-fit-qqplots.pdf", abcAlg.data, resDict, abcAlg.timePoints)
         outHan.write_post_data_to_file(results_path, "post_final_fit_data.txt", resDict, abcAlg.timePoints)
     elif nfp == 2:
         outHan.plot_data_dict_2D(results_path, "plot-gard-final-fit.pdf", resDict, abcAlg.timePoints)
+        #outHan.make_qq_plots(results_path, "plot-gene-exp-final-fit-qqplots.pdf", abcAlg.data, resDict, abcAlg.timePoints)
         outHan.write_post_data_to_file(results_path, "post_final_fit_data.txt", resDict, abcAlg.timePoints)
 
 main()

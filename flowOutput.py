@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 matplotlib.rc('xtick', labelsize=4) 
 matplotlib.rc('ytick', labelsize=4) 
+from scipy.stats import norm
+
+
 
 class output_handler:
     def __init__(self):
@@ -24,14 +27,26 @@ class output_handler:
         pp.close()
 
     def plot_data_dict_1D(self, results_path, file_n, data, timepoints):
+        print 'plotting now...'
         pp = PdfPages(results_path+'/'+file_n)
-        nBins = 50
-
+        #nBins = 50
         cc = 0
+        xmin, xmax = -1, 7
+        x_grid = linspace(xmin, xmax, 1000)
+
         for tp in timepoints:
-            plt.subplot(4,5,cc+1)
-            plt.hist( data[tp], nBins )
-            plt.xlim(0,1500)
+            dat = log10(data[tp][:,0])
+            dat[isneginf(dat)] = 0
+            print dat
+            kde = st.gaussian_kde(dat, bw_method=0.2)
+            pdf = kde.evaluate(x_grid)
+
+            ax = plt.subplot(4, 5, cc + 1)
+            ax.plot(x_grid, pdf, color='blue', alpha=0.5, lw=3)
+            ax.set_xlim([-1, 7])
+
+            #plt.hist( data[tp], nBins )
+            #plt.xscale('log')
             cc += 1
         pp.savefig()
         plt.close()
@@ -42,19 +57,22 @@ class output_handler:
         pp = PdfPages(results_path+'/'+file_n)
         cc = 0
         for tp in timepoints:
-            xmin, xmax = -3, 3
-            ymin, ymax = -3, 3
-            xx, yy = mgrid[xmin:xmax:100j, ymin:ymax:100j]
-            positions = vstack([xx.ravel(), yy.ravel()])
-            values = vstack([ log10(data[tp][:,0]), log10(data[tp][:,1]) ])
-            kernel = st.gaussian_kde(values)
-            f = reshape(kernel(positions).T, xx.shape)
-
+            #print 'tp', tp
+            #xmin, xmax = -1, 7
+            #ymin, ymax = -1, 7
+            #xx, yy = mgrid[xmin:xmax:100j, ymin:ymax:100j]
+            #positions = vstack([xx.ravel(), yy.ravel()])
+            #values = vstack([ log10(data[tp][:,0]), log10(data[tp][:,1]) ])
+            #values[isneginf(values)] = 0
+            #kernel = st.gaussian_kde(values)
+            #f = reshape(kernel(positions).T, xx.shape)
             ax = plt.subplot(4,5,cc+1)
-            ax.contourf(xx, yy, f, cmap='Blues')
-            ax.set_xlim([-1,3])
-            ax.set_ylim([-1,3])
+            ax.scatter(log10(data[tp][:,0]), log10(data[tp][:,1]))
+            #ax.contourf(xx, yy, f, cmap='Blues')
+            ax.set_xlim([-1,7])
+            ax.set_ylim([-1,7])
             cc += 1
+
         pp.savefig()
         plt.close()
         pp.close()
@@ -111,18 +129,26 @@ class output_handler:
         pp.close()
 
     def make_comp_plot_1D(self, results_path, file_n, data, sims, timepoints, ind=0):
+
         pp = PdfPages(results_path+'/'+file_n)
         cc = 0
-        nBins = 20
+        xmin, xmax = -1, 7
+        x_grid = linspace(xmin, xmax, 1000)
+
+        def kernel_est(d, ind, x_grid):
+            dl = log10(d[:, ind])
+            dl[isneginf(dl)] = 0
+            kde = st.gaussian_kde(dl, bw_method=0.2)
+            pdf = kde.evaluate(x_grid)
+            return pdf
+
         for tp in timepoints:
 
-            plt.subplot(4, 5, cc+1)
-            y = data[tp][:, ind]
-            x = sims[tp][:, ind]
-
-            plt.hist(x, nBins, alpha=0.25, label="data")
-            plt.hist(y, nBins, alpha=0.25, label="fit")
-            #plt.legend(loc='upper right')
+            pdf_data = kernel_est(data[tp], ind, x_grid)
+            pdf_sim = kernel_est(sims[tp], ind, x_grid)
+            ax = plt.subplot(4, 5, cc + 1)
+            ax.plot(x_grid, pdf_data, color='blue', alpha=0.5, lw=3)
+            ax.plot(x_grid, pdf_sim, color='red', alpha=0.5, lw=3)
             cc += 1
 
         pp.savefig()
