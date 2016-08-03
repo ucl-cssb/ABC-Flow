@@ -137,7 +137,8 @@ class output_handler:
 
         def kernel_est(d, ind, x_grid):
             dl = log10(d[:, ind])
-            dl[isneginf(dl)] = 0
+            #dl[isneginf(dl)] = 0
+            dl = dl[isfinite(dl)]
             kde = st.gaussian_kde(dl, bw_method=0.2)
             pdf = kde.evaluate(x_grid)
             return pdf
