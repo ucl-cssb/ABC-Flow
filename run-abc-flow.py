@@ -186,6 +186,8 @@ class abc_flow:
     def set_epsilon(self, acceptedDists, alpha):
 
         accDist = sorted(acceptedDists)
+        #print accDist
+        #print len(accDist), alpha
         epsilon = accDist[alpha]
         return epsilon
 
@@ -239,7 +241,8 @@ class abc_flow:
         print "           : Final acceptance rate = ", naccepted/float(ntotsim)
         return [acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs, acceptedDists]
 
-    def do_abc_smc(self, model, nbeta, nparticles, alpha, epsilon_final):
+    def do_abc_smc(self, model, nbeta, nparticles, alpha, epsilon_final,
+                   outHan, nfp, fps, results_path):
 
         pop = 0
         finishTotal = False
@@ -334,11 +337,55 @@ class abc_flow:
             acceptedIntMus = deepcopy(currIntMus)
             acceptedIntSgs = deepcopy(currIntSgs)
 
+            # write progress out
+            outfolder = results_path + "/pop"+repr(pop)
+            os.makedirs(outfolder)
+            self.write_outputs(outHan, nfp, fps, outfolder, model, nbeta, acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs, acceptedWeights )
+
             if epsilon <= epsilon_final:
                 finishTotal = True
                 print "do_abc_smc : Completed successfully"
 
         return [acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs, acceptedWeights]
+
+    def write_outputs(self, outHan, nfp, fps, results_path, model_n, nbeta,  accPars, accInit, accMus, accSgs, accWeights ):
+
+        # calculate posterior medians
+        medPars = zeros([1, model_n.nparams])
+        medInit = zeros([1, model_n.nspecies])
+        medMu = zeros([1, nfp])
+        medSg = zeros([1, nfp])
+
+        medPars[0, :] = [median(accPars[:, i]) for i in range(model_n.nparams)]
+        medInit[0, :] = [median(accInit[:, i]) for i in range(model_n.nspecies)]
+        medMu[0, :] = [median(accMus[:, i]) for i in range(nfp)]
+        medSg[0, :] = [median(accSgs[:, i]) for i in range(nfp)]
+        print "posterior median values dynpar/inits :\n", medPars, "\n", medInit, "\n", medMu, "\n", medSg
+
+        outHan.make_post_hists(results_path, "plot-posteriors-dyn.pdf", accPars, model_n.nparams)
+        outHan.make_post_hists(results_path, "plot-posteriors-init.pdf", accInit, model_n.nspecies)
+        outHan.make_post_hists(results_path, "plot-posteriors-mu.pdf", accMus, nfp)
+        outHan.make_post_hists(results_path, "plot-posteriors-sg.pdf", accSgs, nfp)
+
+        outHan.write_post_params_to_file(results_path, "data-posteriors-dyn.txt", accPars, model_n.nparams)
+        outHan.write_post_params_to_file(results_path, "data-posteriors-init.txt", accInit, model_n.nspecies)
+        outHan.write_post_params_to_file(results_path, "data-posteriors-mu.txt", accMus, nfp)
+        outHan.write_post_params_to_file(results_path, "data-posteriors-sg.txt", accSgs, nfp)
+
+        #Make new model instance
+        model_n.create_model_instance(nbeta, self.timePoints)
+        res = model_n.simulate(1, medPars, medInit, fps, medMu, medSg)
+        #print res
+
+        # convert the output of cuda-sim into a data dictionary
+        resDict = model.create_dict(res, self.timePoints)[0]
+        # make some plots
+        if nfp == 1:
+            outHan.make_comp_plot_1D(results_path, "plot-final-fit.pdf", self.data, resDict, self.timePoints)
+            outHan.write_post_data_to_file(results_path, "post-final-fit-data.txt", resDict, self.timePoints)
+        elif nfp == 2:
+            outHan.plot_data_dict_2D(results_path, "plot-final-fit.pdf", resDict, self.timePoints)
+            outHan.write_post_data_to_file(results_path, "post-final-fit-data.txt", resDict, self.timePoints)
 
 
 def read_input(filename):
@@ -437,46 +484,49 @@ def main():
 
     if algorithm == 'abc_smc':
         print 'Do abc_smc'
-        accPars, accInit, accMus, accSgs, accWeights = abcAlg.do_abc_smc(model_n, nbeta, nparticles, alpha, epsilon_final)
+        accPars, accInit, accMus, accSgs, accWeights = abcAlg.do_abc_smc(model_n, nbeta, nparticles, alpha, epsilon_final,
+                                                                         outHan, nfp, fps, results_path) # for printing putput within algorithm
     elif algorithm == 'abc_rej':
         accPars, accInit, accMus, accSgs = abcAlg.do_abc_rej(model_n, nbeta, nparticles, epsilon_final)
 
-    # calculate posterior medians
-    medPars = zeros([1, model_n.nparams])
-    medInit = zeros([1, model_n.nspecies])
-    medMu = zeros([1, nfp])
-    medSg = zeros([1, nfp])
+    # finished
 
-    medPars[0, :] = [median(accPars[:, i]) for i in range(model_n.nparams)]
-    medInit[0, :] = [median(accInit[:, i]) for i in range(model_n.nspecies)]
-    medMu[0, :] = [median(accMus[:, i]) for i in range(nfp)]
-    medSg[0, :] = [median(accSgs[:, i]) for i in range(nfp)]
-    print "posterior median values dynpar/inits :", medPars, medInit, medMu, medSg
+   ##  # calculate posterior medians
+##     medPars = zeros([1, model_n.nparams])
+##     medInit = zeros([1, model_n.nspecies])
+##     medMu = zeros([1, nfp])
+##     medSg = zeros([1, nfp])
 
-    outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-dyn.pdf", accPars, nparam)
-    outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-init.pdf", accInit, nspec)
-    outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-mu.pdf", accMus, nfp)
-    outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-sg.pdf", accSgs, nfp)
+##     medPars[0, :] = [median(accPars[:, i]) for i in range(model_n.nparams)]
+##     medInit[0, :] = [median(accInit[:, i]) for i in range(model_n.nspecies)]
+##     medMu[0, :] = [median(accMus[:, i]) for i in range(nfp)]
+##     medSg[0, :] = [median(accSgs[:, i]) for i in range(nfp)]
+##     print "posterior median values dynpar/inits :", medPars, medInit, medMu, medSg
 
-    outHan.write_post_params_to_file(results_path, "data-posteriors-dyn.txt", accPars, nparam)
-    outHan.write_post_params_to_file(results_path, "data-posteriors-init.txt", accInit, nspec)
-    outHan.write_post_params_to_file(results_path, "data-posteriors-mu.txt", accMus, nfp)
-    outHan.write_post_params_to_file(results_path, "data-posteriors-sg.txt", accSgs, nfp)
+##     outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-dyn.pdf", accPars, nparam)
+##     outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-init.pdf", accInit, nspec)
+##     outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-mu.pdf", accMus, nfp)
+##     outHan.make_post_hists(results_path, "plot-gardner-2D-posteriors-sg.pdf", accSgs, nfp)
 
-    #Make new model instance
-    model_n.create_model_instance(nbeta, abcAlg.timePoints)
-    res = model_n.simulate(1, medPars, medInit, fps, medMu, medSg)
+##     outHan.write_post_params_to_file(results_path, "data-posteriors-dyn.txt", accPars, nparam)
+##     outHan.write_post_params_to_file(results_path, "data-posteriors-init.txt", accInit, nspec)
+##     outHan.write_post_params_to_file(results_path, "data-posteriors-mu.txt", accMus, nfp)
+##     outHan.write_post_params_to_file(results_path, "data-posteriors-sg.txt", accSgs, nfp)
 
-    # convert the output of cuda-sim into a data dictionary
-    resDict = model.create_dict(res, abcAlg.timePoints)[0]
-    # make some plots
-    if nfp == 1:
-        outHan.make_comp_plot_1D(results_path, "plot-gene-exp-final-fit.pdf", abcAlg.data, resDict, abcAlg.timePoints)
-        #outHan.make_qq_plots(results_path, "plot-gene-exp-final-fit-qqplots.pdf", abcAlg.data, resDict, abcAlg.timePoints)
-        outHan.write_post_data_to_file(results_path, "post_final_fit_data.txt", resDict, abcAlg.timePoints)
-    elif nfp == 2:
-        outHan.plot_data_dict_2D(results_path, "plot-gard-final-fit.pdf", resDict, abcAlg.timePoints)
-        #outHan.make_qq_plots(results_path, "plot-gene-exp-final-fit-qqplots.pdf", abcAlg.data, resDict, abcAlg.timePoints)
-        outHan.write_post_data_to_file(results_path, "post_final_fit_data.txt", resDict, abcAlg.timePoints)
+##     #Make new model instance
+##     model_n.create_model_instance(nbeta, abcAlg.timePoints)
+##     res = model_n.simulate(1, medPars, medInit, fps, medMu, medSg)
+
+##     # convert the output of cuda-sim into a data dictionary
+##     resDict = model.create_dict(res, abcAlg.timePoints)[0]
+##     # make some plots
+##     if nfp == 1:
+##         outHan.make_comp_plot_1D(results_path, "plot-gene-exp-final-fit.pdf", abcAlg.data, resDict, abcAlg.timePoints)
+##         #outHan.make_qq_plots(results_path, "plot-gene-exp-final-fit-qqplots.pdf", abcAlg.data, resDict, abcAlg.timePoints)
+##         outHan.write_post_data_to_file(results_path, "post_final_fit_data.txt", resDict, abcAlg.timePoints)
+##     elif nfp == 2:
+##         outHan.plot_data_dict_2D(results_path, "plot-gard-final-fit.pdf", resDict, abcAlg.timePoints)
+##         #outHan.make_qq_plots(results_path, "plot-gene-exp-final-fit-qqplots.pdf", abcAlg.data, resDict, abcAlg.timePoints)
+##         outHan.write_post_data_to_file(results_path, "post_final_fit_data.txt", resDict, abcAlg.timePoints)
 
 main()

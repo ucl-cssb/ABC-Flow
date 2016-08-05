@@ -35,7 +35,7 @@ class output_handler:
         x_grid = linspace(xmin, xmax, 1000)
 
         for tp in timepoints:
-            dat = log10(data[tp][:,0])
+            dat = log10(1+data[tp][:,0])
             dat[isneginf(dat)] = 0
             print dat
             kde = st.gaussian_kde(dat, bw_method=0.2)
@@ -67,7 +67,7 @@ class output_handler:
             #kernel = st.gaussian_kde(values)
             #f = reshape(kernel(positions).T, xx.shape)
             ax = plt.subplot(4,5,cc+1)
-            ax.scatter(log10(data[tp][:,0]), log10(data[tp][:,1]))
+            ax.scatter(log10(1+data[tp][:,0]), log10(1+data[tp][:,1]))
             #ax.contourf(xx, yy, f, cmap='Blues')
             ax.set_xlim([-1,7])
             ax.set_ylim([-1,7])
@@ -87,13 +87,13 @@ class output_handler:
 
             xx, yy = mgrid[xmin:xmax:100j, ymin:ymax:100j]
             positions = vstack([xx.ravel(), yy.ravel()])
-            values = vstack([ log10(data[tp][:, 0]), log10(data[tp][:, 1])])
+            values = vstack([ log10(1+data[tp][:, 0]), log10(1+data[tp][:, 1])])
             kernel = st.gaussian_kde(values)
             f = reshape(kernel(positions).T, xx.shape)
 
             xxf, yyf = mgrid[xmin:xmax:100j, ymin:ymax:100j]
             positions_f = vstack([xxf.ravel(), yyf.ravel()])
-            values_f = vstack([log10(fit[tp][:, 0]), log10(fit[tp][:, 1])])
+            values_f = vstack([log10(1+fit[tp][:, 0]), log10(1+fit[tp][:, 1])])
             kernel_f = st.gaussian_kde(values_f)
             ff = reshape(kernel_f(positions_f).T, xxf.shape)
 
@@ -136,7 +136,7 @@ class output_handler:
         x_grid = linspace(xmin, xmax, 1000)
 
         def kernel_est(d, ind, x_grid):
-            dl = log10(d[:, ind])
+            dl = log10(1+d[:, ind])
             #dl[isneginf(dl)] = 0
             dl = dl[isfinite(dl)]
             kde = st.gaussian_kde(dl, bw_method=0.2)
