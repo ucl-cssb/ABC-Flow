@@ -81,8 +81,10 @@ class abc_flow:
 
     # Sampling and perturbing functions
     def sample_perturb_pars(self, n, prior, prev, ids, scales):
-        ret = zeros(shape(prev))
+
         npar = shape(prev)[1]
+        ret = zeros((n, npar))
+
         for i in range(n):
             for j in range(npar):
                 ret[i, j] = self.kernel_pert(prev[ids[i], j], prior[j, :], scales[j])
@@ -461,7 +463,7 @@ def main():
                 results_path = arg
             except:
                 print 'Results folder already exists'
-    alpha = int(math.ceil(alp * nparticles))
+    alpha = int(math.ceil(alp * nparticles))-1
     print 'alpha: ', alpha
     print 'epsilon_final: ', epsilon_final
     abcAlg = abc_flow()
