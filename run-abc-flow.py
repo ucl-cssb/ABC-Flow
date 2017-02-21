@@ -471,10 +471,10 @@ def main():
 
     # plot the data
     outHan = output_handler()
-    #if nfp == 1:
-    #    outHan.plot_data_dict_1D(results_path, plot_data_file, abcAlg.data, abcAlg.timePoints)
-    #elif nfp == 2:
-    #    outHan.plot_data_dict_2D(results_path, plot_data_file, abcAlg.data, abcAlg.timePoints)
+    if nfp == 1:
+        outHan.plot_data_dict_1D(results_path, plot_data_file, abcAlg.data, abcAlg.timePoints)
+    elif nfp == 2:
+        outHan.plot_data_dict_2D(results_path, plot_data_file, abcAlg.data, abcAlg.timePoints)
 
     # define the model
     model_n = model.model(model_file, nspecies=nspec, nparams=nparam)

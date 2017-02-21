@@ -31,7 +31,7 @@ class output_handler:
         pp = PdfPages(results_path+'/'+file_n)
         #nBins = 50
         cc = 0
-        xmin, xmax = -1, 7
+        xmin, xmax = -1, 4
         x_grid = linspace(xmin, xmax, 1000)
 
         for tp in timepoints:
@@ -56,21 +56,27 @@ class output_handler:
 
         pp = PdfPages(results_path+'/'+file_n)
         cc = 0
+        xmin, xmax = -1, 4
         for tp in timepoints:
             #print 'tp', tp
-            #xmin, xmax = -1, 7
-            #ymin, ymax = -1, 7
-            #xx, yy = mgrid[xmin:xmax:100j, ymin:ymax:100j]
-            #positions = vstack([xx.ravel(), yy.ravel()])
-            #values = vstack([ log10(data[tp][:,0]), log10(data[tp][:,1]) ])
-            #values[isneginf(values)] = 0
-            #kernel = st.gaussian_kde(values)
-            #f = reshape(kernel(positions).T, xx.shape)
+            xmin, xmax = 0, 3
+            ymin, ymax = 0, 3
+
             ax = plt.subplot(4,5,cc+1)
-            ax.scatter(log10(1+data[tp][:,0]), log10(1+data[tp][:,1]))
-            #ax.contourf(xx, yy, f, cmap='Blues')
-            ax.set_xlim([-1,7])
-            ax.set_ylim([-1,7])
+            if 0:
+                xx, yy = mgrid[xmin:xmax:100j, ymin:ymax:100j]
+                positions = vstack([xx.ravel(), yy.ravel()])
+                values = vstack([ log10(data[tp][:,0]), log10(data[tp][:,1]) ])
+                values[isneginf(values)] = 0
+                kernel = st.gaussian_kde(values)
+                f = reshape(kernel(positions).T, xx.shape)
+                ax.contourf(xx, yy, f, cmap='Blues')
+
+            if 1:
+                ax.scatter(log10(1+data[tp][:,0]), log10(1+data[tp][:,1]), s=0.1)
+                ax.set_xlim([xmin,xmax])
+                ax.set_ylim([ymin,ymax])
+
             cc += 1
 
         pp.savefig()
