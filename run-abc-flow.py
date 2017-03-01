@@ -248,30 +248,34 @@ class abc_flow:
 
         pop = 0
         finishTotal = False
-        #npop = len(epsilons)
         nbatch = 100
+        
         model.create_model_instance(nbeta, self.timePoints)
         self.nSpecies, self.nDynPars = model.get_model_info()
-        # do the first population sampling from the prior
-        print "do_abc_smc : Population 0"
 
-        acceptedDynParams = self.sample_dyn_pars(nbatch)
-        # Initial conditions
-        acceptedInits = self.sample_inits(nbatch)
-        # Intensity parameters
-        acceptedIntMus, acceptedIntSgs = self.sample_int_pars(nbatch)
-        print "\tDone sampling"
-        sims = model.simulate(nbatch, acceptedDynParams, acceptedInits, self.fps, acceptedIntMus, acceptedIntSgs)
-        print "\tDone simulation"
-        currDists = self.compare_to_data(nbatch, nbeta, sims, self.nFP)
-        #acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs, acceptedDists = self.do_abc_rej(model, nbeta, nparticles, epsilons[0])
+        print "do_abc_smc : estimating starting epsilon"
+        tDynParams = self.sample_dyn_pars(nparticles)
+        tInits = self.sample_inits(nparticles)
+        tIntMus, tIntSgs = self.sample_int_pars(nparticles)
+        sims = model.simulate(nparticles, tDynParams, tInits, self.fps, tIntMus, tIntSgs)
+        tDists = self.compare_to_data(nparticles, nbeta, sims, self.nFP)
+        
+        epsilon = self.set_epsilon(tDists, alpha)
+        print "Epsilon pop: ", pop, epsilon
+
+        print "do_abc_smc : Population 0"
+        acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs, currDists = self.do_abc_rej(model, nbeta, nparticles, epsilon)
         acceptedWeights = ones([nparticles])/float(nparticles)
+
+        outfolder = results_path + "/pop"+repr(0)
+        os.makedirs(outfolder)
+        self.write_outputs(outHan, nfp, fps, outfolder, model, nbeta, acceptedDynParams, acceptedInits, acceptedIntMus, acceptedIntSgs, acceptedWeights )
 
         while finishTotal == False:
         #for pop in range(1, npop):
             pop += 1
             epsilon = self.set_epsilon(currDists, alpha)
-            print "Epsilon current:", epsilon
+            print "Epsilon pop: ", pop, epsilon
 
             currDynParams = zeros([nparticles, self.nDynPars])
             currInits = zeros([nparticles, self.nSpecies])
@@ -373,6 +377,8 @@ class abc_flow:
         outHan.write_post_params_to_file(results_path, "data-posteriors-init.txt", accInit, model_n.nspecies)
         outHan.write_post_params_to_file(results_path, "data-posteriors-mu.txt", accMus, nfp)
         outHan.write_post_params_to_file(results_path, "data-posteriors-sg.txt", accSgs, nfp)
+
+        outHan.write_post_weight_to_file(results_path, "data-weights.txt", accWeights, nfp)
 
         #Make new model instance
         model_n.create_model_instance(nbeta, self.timePoints)

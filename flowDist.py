@@ -1,6 +1,7 @@
 from numpy import *
 from scipy import stats
 from ks_2s_ndtest import ks2d2s
+from wald_wolfowitz import ww_test
 
 def get_kd_distance1D(data, sims, ngrid):
     xmin = min(data[:, 0])
@@ -21,6 +22,8 @@ def get_kd_distance1D(data, sims, ngrid):
     return d[0]
 
 def get_kd_distance2D(data, sims, ngrid):
+
+    # KERNEL DISTANCE
     # # evaluate on the same grid as the data
     # xmin = min(data[:, 0])
     # xmax = max(data[:, 0])
@@ -48,11 +51,16 @@ def get_kd_distance2D(data, sims, ngrid):
     #     return 1e4
     #
     # fS = reshape(kS(positions).T, xx.shape)
-
     #d = sum((fD-fS)*(fD-fS))
-    d = ks2d2s(data[:, 0], data[:, 1], sims[:, 0], sims[:, 1], nboot=None, extra=True)
-    return abs(d[1])
+    #return da
 
+    # 2D KS DISTANCE
+    #d = ks2d2s(data[:, 0], data[:, 1], sims[:, 0], sims[:, 1], nboot=None, extra=True)
+    #return abs(d[1])
+
+    # WW distance
+    W, R = ww_test(data, sims)
+    return abs(W)
 
 if __name__ == "__main__":
     mu1 = array([1, 10])

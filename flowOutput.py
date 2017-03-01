@@ -177,6 +177,9 @@ class output_handler:
     def write_post_params_to_file(self, results_path, file_n, post, pars):
         savetxt(results_path+'/'+file_n, post, delimiter=' ')
 
+    def write_post_weight_to_file(self, results_path, file_n, wgts, pars):
+        savetxt(results_path+'/'+file_n, wgts, delimiter=' ')
+
 
     def write_post_data_to_file(self, results_path, file_n, data, timepoints):
         values = []
