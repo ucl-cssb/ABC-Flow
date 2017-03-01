@@ -37,7 +37,7 @@ class output_handler:
         for tp in timepoints:
             dat = log10(1+data[tp][:,0])
             dat[isneginf(dat)] = 0
-            print dat
+            #print dat
             kde = st.gaussian_kde(dat, bw_method=0.2)
             pdf = kde.evaluate(x_grid)
 

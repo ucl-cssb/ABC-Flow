@@ -434,6 +434,14 @@ def read_input(filename):
         intensSigmaPrior.append([item.find('start').text, item.find('end').text])
     intensSigmaPrior = array(intensSigmaPrior)
 
+    backgrounds = []
+    for item in document.find('backgrounds').getchildren():
+        backgrounds.append([float(item.find('mean').text), float(item.find('sigma').text)])
+    backgrounds = array(backgrounds)
+
+    print "backgrounds:"
+    print backgrounds
+
     #epsilons = []
     #for item in document.find('epsilons').getchildren():
     #    epsilons.append(float(item.find('epsilon').text))
@@ -451,7 +459,7 @@ def read_input(filename):
     algorithm = alg.text
 
     return data_file, plot_data_file, model_file, dynPriors, iniPriors, nparam, nspec, fps, nfp, intensMeanPrior, \
-           intensSigmaPrior, epsilon_final, alpha, nparticles, nbeta, algorithm
+           intensSigmaPrior, epsilon_final, alpha, nparticles, nbeta, algorithm, backgrounds
 
 
 def main():
@@ -461,7 +469,7 @@ def main():
         if opt in ("-i", "--ifile"):
             print 'Reading input file'
             data_file, plot_data_file, model_file, dynPriorMatrix, initPriorMatrix, nparam, nspec, fps, nfp,\
-                intMeanPriorMatrix, intSigmaPriorMatrix, epsilon_final, alp, nparticles, nbeta, algorithm = read_input(arg)
+                intMeanPriorMatrix, intSigmaPriorMatrix, epsilon_final, alp, nparticles, nbeta, algorithm, backgrounds = read_input(arg)
 
         if opt in ("-o", "--ofile"):
             try:
@@ -483,7 +491,7 @@ def main():
         outHan.plot_data_dict_2D(results_path, plot_data_file, abcAlg.data, abcAlg.timePoints)
 
     # define the model
-    model_n = model.model(model_file, nspecies=nspec, nparams=nparam)
+    model_n = model.model(model_file, nspecies=nspec, nparams=nparam, background=backgrounds)
 
     # Set the internal variables
     abcAlg.set_dynamical_priors( dynPriorMatrix)

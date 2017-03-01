@@ -9,12 +9,13 @@ import cudasim.Gillespie as Gillespie
 import cudasim.Lsoda as Lsoda
 
 class model:
-    def __init__(self, cudaFile, nspecies, nparams):
+    def __init__(self, cudaFile, nspecies, nparams, background):
         self.cudaFile = cudaFile
         self.nspecies = nspecies
         self.nparams = nparams
         self.logp = False 
         self.modelInstance = 0
+        self.background = background
 
 
     def create_model_instance(self, beta, timepoints):
@@ -30,15 +31,15 @@ class model:
         return [self.nspecies, self.nparams]
 
     # can handle single FP
-    def convert_to_intensity(self, nFP, mu, sigma):
-        signal = 0.01
-        
+    def convert_to_intensity(self, nFP, mu, sigma, mu_b, sigma_b):
+
+        # Normally distributed background
+        signal = normal(mu_b,sigma_b)
+
         # Addition of normals
         if nFP > 0:
-            #max: Return the maximum of an array or maximum along an axis
-            #normal: Draw random samples from a normal (Gaussian) distribution.
-            #signal = max(0.0001, normal(nFP*mu, sqrt(nFP*sigma*sigma)))
-        	signal =  normal(nFP*mu, sqrt(nFP*sigma*sigma))
+            signal =  signal + normal(nFP*mu, sqrt(nFP*sigma*sigma))
+
         return signal
 
     def simulate(self, n, pars, inits,  fps, intMus, intSgs):
@@ -64,7 +65,7 @@ class model:
             for j in range(self.beta):
                 for k in range(self.ntimes):
                     for l in range(len(fps)):
-                        simInt[i, j, k, fps[l]] = self.convert_to_intensity(simRaw[i, j, k, fps[l]], intMus[i, l], intSgs[i, l])
+                        simInt[i, j, k, fps[l]] = self.convert_to_intensity(simRaw[i, j, k, fps[l]], intMus[i, l], intSgs[i, l], self.background[l][0],  self.background[l][1])
 
         return simInt
 
