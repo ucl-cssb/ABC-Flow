@@ -128,7 +128,7 @@ class abc_flow:
         return ret
 
     # Simulation and comparison to data
-    def compare_to_data(self, n, nbeta, sims, mode=3):
+    def compare_to_data(self, n, nbeta, sims, nFP, fps):
         ret = zeros([n, 1])
 
         # create a dictionary of the same form as the data
@@ -153,7 +153,7 @@ class abc_flow:
                 #        print "compare_to_data : mode 1 : Difference in data and simulation dimensions"
                 #        exit()
 
-                if mode == 1:
+                if nFP == 1:
                     # One dimensional data, general case, sum of Kolmogorov distances
                     ##y = sorted(self.data[tp][:, 0])
                     ##x = sorted(sim[tp][:, 0])
@@ -164,10 +164,10 @@ class abc_flow:
                     #Returns [KS-statistic, p-value]
                     ##dist += rr[0]
                     #dist += ks_2samp(self.data[tp][:, 0], sim[tp][:, 0])
-                    dist += get_kd_distance1D(self.data[tp], sim[tp], ngrid=100)
-                if mode == 2:
+                    dist += get_kd_distance1D(self.data[tp], sim[tp], ngrid=100, fps=fps)
+                if nFP == 2:
                     # Multivariate data, use distance between kernel density estimates
-                    dist += get_kd_distance2D(self.data[tp], sim[tp], ngrid=10j)
+                    dist += get_kd_distance2D(self.data[tp], sim[tp], ngrid=10j, fps=fps)
 
             ret[j] = dist/len(self.timePoints)
 
@@ -221,7 +221,7 @@ class abc_flow:
             print "\tDone sampling"
             sims = model.simulate(nbatch, dynParameters, inits, self.fps, intMus, intSgs)
             print "\tDone simulation"
-            dists = self.compare_to_data(nbatch, nbeta, sims, self.nFP )
+            dists = self.compare_to_data(nbatch, nbeta, sims, self.nFP, self.fps )
             print 'dists: ', dists
             print "\tDone distance calculation"
             accMask = self.check_distance(nbatch, dists, eps)
@@ -258,7 +258,7 @@ class abc_flow:
         tInits = self.sample_inits(nparticles)
         tIntMus, tIntSgs = self.sample_int_pars(nparticles)
         sims = model.simulate(nparticles, tDynParams, tInits, self.fps, tIntMus, tIntSgs)
-        tDists = self.compare_to_data(nparticles, nbeta, sims, self.nFP)
+        tDists = self.compare_to_data(nparticles, nbeta, sims, self.nFP, self.fps)
         
         epsilon = self.set_epsilon(tDists, alpha)
         print "Epsilon pop: ", pop, epsilon
@@ -306,7 +306,7 @@ class abc_flow:
                 print "\tDone sampling"
 
                 sims = model.simulate(nbatch, dynParameters, inits, self.fps, intMus, intSgs)
-                dists = self.compare_to_data(nbatch, nbeta, sims, self.nFP)
+                dists = self.compare_to_data(nbatch, nbeta, sims, self.nFP, self.fps)
                 accMask = self.check_distance(nbatch, dists, epsilon)
                 ntotsim += nbatch
 
@@ -392,7 +392,7 @@ class abc_flow:
             outHan.make_comp_plot_1D(results_path, "plot-final-fit.pdf", self.data, resDict, self.timePoints)
             outHan.write_post_data_to_file(results_path, "post-final-fit-data.txt", resDict, self.timePoints)
         elif nfp == 2:
-            outHan.plot_data_dict_2D(results_path, "plot-final-fit.pdf", resDict, self.timePoints)
+            outHan.plot_data_comb_2D(results_path, "plot-final-fit.pdf", self.data, resDict, self.timePoints, self.fps)
             outHan.write_post_data_to_file(results_path, "post-final-fit-data.txt", resDict, self.timePoints)
 
 
