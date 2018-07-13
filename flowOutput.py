@@ -181,9 +181,22 @@ class output_handler:
         savetxt(results_path+'/'+file_n, wgts, delimiter=' ')
 
 
-    def write_post_data_to_file(self, results_path, file_n, data, timepoints):
+    def write_post_data_to_file(results_path, file_n, data, timepoints):
         values = []
         for tp in timepoints:
-            for sp in range(len(data[tp][:, 0])):
-                values.append([tp, data[tp][sp, 0], data[tp][sp, 1]])
+            #print data[tp]
+            for sp in range(len(data[tp])):
+                #print "\t", data[tp][sp]
+                values.append([tp, data[tp][sp][0][0], data[tp][sp][0][1]])
+
         savetxt(results_path+'/'+file_n, asarray(values), delimiter=' ')
+
+        
+    #def write_post_data_to_file(self, results_path, file_n, data, timepoints):
+    #    values = []
+    #    for tp in timepoints:
+    #        for sp in range(len(data[tp][:, 0])):
+    #            values.append([tp, data[tp][sp, 0], data[tp][sp, 1]])
+    #    savetxt(results_path+'/'+file_n, asarray(values), delimiter=' ')
+
+        

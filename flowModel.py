@@ -70,6 +70,23 @@ class model:
         return simInt
 
 # Return the results of cuda-sim as a list of dictionaries of the same form as we read the data
+#def create_dict(sims, timePoints):
+#    
+#    n = len(sims[:,0,0,0])
+#    ntimePoints = len(timePoints)
+#    #print "create_dict: ", n, timePoints, ntimePoints
+#    
+#    ret = []
+#    
+#    for j in range(n):
+#        retDict = {}
+#        for nt in range(ntimePoints):
+#            retDict[ timePoints[nt] ] = sims[j,:,nt,:]
+#
+#        ret.append( retDict )
+#
+#    return ret
+
 def create_dict(sims, timePoints):
     
     n = len(sims[:,0,0,0])
@@ -77,12 +94,13 @@ def create_dict(sims, timePoints):
     #print "create_dict: ", n, timePoints, ntimePoints
     
     ret = []
-    
+
+    retDict = {}
+    for nt in range(ntimePoints):
+        retDict[ timePoints[nt] ] = []
+
     for j in range(n):
-        retDict = {}
         for nt in range(ntimePoints):
-            retDict[ timePoints[nt] ] = sims[j,:,nt,:]
+            retDict[ timePoints[nt] ].append(sims[j,:,nt,:])
 
-        ret.append( retDict )
-
-    return ret
+    return retDict
