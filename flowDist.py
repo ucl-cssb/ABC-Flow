@@ -3,7 +3,7 @@ from scipy import stats
 from ks_2s_ndtest import ks2d2s
 from wald_wolfowitz import ww_test
 
-def get_kd_distance1D(data, sims, ngrid):
+def get_kd_distance1D(data, sims, ngrid, fps):
     xmin = min(data[:, 0])
     xmax = max(data[:, 0])
     xx = linspace(xmin, xmax, ngrid)
@@ -18,10 +18,10 @@ def get_kd_distance1D(data, sims, ngrid):
     fS = reshape(kS(xx).T, xx.shape)
     #d = stats.ks_2samp(fD, fS)
     #d = sum((fD-fS)*(fD-fS))
-    d = stats.ks_2samp(data[:, 0], sims[:, 0])
+    d = stats.ks_2samp(data[:, 0], sims[:, fps])
     return d[0]
 
-def get_kd_distance2D(data, sims, ngrid):
+def get_kd_distance2D(data, sims, ngrid, fps):
 
     # KERNEL DISTANCE
     # # evaluate on the same grid as the data
@@ -59,7 +59,8 @@ def get_kd_distance2D(data, sims, ngrid):
     #return abs(d[1])
 
     # WW distance
-    W, R = ww_test(data, sims)
+    #print "WW distance:", fps
+    W, R = ww_test(data, sims[:,fps])
     return abs(W)
 
 if __name__ == "__main__":
