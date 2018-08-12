@@ -386,7 +386,7 @@ class abc_flow:
         #print res
 
         # convert the output of cuda-sim into a data dictionary
-        resDict = model.create_dict(res, self.timePoints)[0]
+        resDict = model.create_dict(res, self.timePoints)
         # make some plots
         if nfp == 1:
             outHan.make_comp_plot_1D(results_path, "plot-final-fit.pdf", self.data, resDict, self.timePoints)
@@ -426,12 +426,12 @@ def read_input(filename):
 
     intensMeanPrior = []
     for item in document.find('intensMeanPrior').getchildren():
-        intensMeanPrior.append([item.find('start').text, item.find('end').text])
+        intensMeanPrior.append([float(item.find('start').text), float(item.find('end').text)])
     intensMeanPrior = array(intensMeanPrior)
 
     intensSigmaPrior = []
     for item in document.find('intensSigmaPrior').getchildren():
-        intensSigmaPrior.append([item.find('start').text, item.find('end').text])
+        intensSigmaPrior.append([float(item.find('start').text), float(item.find('end').text)])
     intensSigmaPrior = array(intensSigmaPrior)
 
     backgrounds = []
